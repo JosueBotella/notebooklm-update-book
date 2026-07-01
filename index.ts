@@ -500,6 +500,12 @@ async function main() {
     const args = process.argv.slice(2);
     const command = args[0];
 
+    // Registrar proyecto automáticamente si estamos en su directorio y tiene notebook-sync.json
+    const localConfig = loadProjectConfig();
+    if (localConfig && localConfig.config.project_name) {
+        registerProject(localConfig.config.project_name, path.dirname(localConfig.filePath));
+    }
+
     // Por compatibilidad con los scripts preexistentes que usan --path directamente
     if (command && (command === '--path' || args.includes('--path'))) {
         await handleUpload();
