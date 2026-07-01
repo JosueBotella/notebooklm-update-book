@@ -1,78 +1,85 @@
-# NotebookLM Updater (CLI)
+# NotebookLM CLI Updater
 
-Este mini-proyecto es una herramienta de línea de comandos (CLI) creada para actuar como un **puente automatizado** entre tu disco duro local y tu cuenta de Google NotebookLM. 
-
-Su único propósito (siguiendo el Principio de Responsabilidad Única o SRP) es coger una carpeta llena de archivos Markdown (`.md`) e inyectarlos masivamente en un cuaderno de NotebookLM usando el protocolo MCP (Model Context Protocol).
+Esta herramienta CLI es un puente automatizado que te permite conectar y sincronizar directorios de archivos Markdown (`.md`) de tu ordenador local directamente con tu cuenta de **Google NotebookLM** mediante el Model Context Protocol (MCP), con soporte nativo para **múltiples cuentas de usuario**.
 
 ---
 
-## 🧠 ¿Por qué este proyecto? (Lógica de Arquitectura)
+## ⚙️ Prerrequisitos
 
-En lugar de mezclar la lógica de "Subir a NotebookLM" dentro del proyecto que "Genera los esquemas de base de datos" (`db-schema-generator`), hemos separado las responsabilidades. 
-De esta forma:
-1. `db-schema-generator` solo se preocupa de leer MySQL y escupir Markdowns.
-2. `notebooklm-update-book` solo se preocupa de leer Markdowns (vengan de donde vengan) y enviarlos a Google.
+Para poder utilizar este script en tu máquina, necesitas contar con lo siguiente:
 
-Esto te permite usar esta misma herramienta para subir esquemas de BBDD, documentación de negocio de React (`vnapp-refactor`), actas de reuniones, o cualquier carpeta de texto a tu cerebro de IA.
-
----
-
-## 🛠️ Librerías Utilizadas
-
-Para mantener el proyecto lo más ligero posible, hemos usado el mínimo de dependencias externas:
-
-1. **`@modelcontextprotocol/sdk`**: Es la librería oficial que nos permite "hablar" con servidores MCP. En lugar de hacer complejas peticiones HTTP a la API privada de Google, esta librería se conecta al proceso `notebooklm-mcp.exe` que está en tu ordenador y le manda comandos estructurados.
-2. **`tsx`**: En el mundo de Node.js, los archivos `.ts` (TypeScript) no se pueden ejecutar directamente, hay que transpilarlos a `.js` (JavaScript) primero usando el comando `tsc`. `tsx` es un motor de ejecución en tiempo real que hace esta conversión al vuelo en memoria. Nos ahorra el paso de compilar.
-3. **`fs` y `path` (Nativas de Node.js)**: 
-   - `fs` (File System): Nos permite leer el contenido de las carpetas locales (`fs.readdirSync`) y leer el texto de cada archivo (`fs.readFileSync`).
-   - `path`: Nos ayuda a unir rutas de carpetas de forma segura en Windows (con sus barras `\` invertidas).
-4. **`typescript` y `@types/node`**: Librerías de desarrollo que proveen el tipado estático (el superpoder de TypeScript) y el autocompletado en tu editor VSCode.
+1.  **Node.js** (versión 18.0.0 o superior).
+2.  **Un gestor de paquetes de Node** (se recomienda **pnpm**, pero puedes usar `npm` o `yarn`).
+3.  **El Servidor MCP de NotebookLM**: Tener instalado y configurado el servidor `notebooklm-mcp.exe` en tu sistema Windows (por defecto, el script buscará el ejecutable en `~/.local/bin/notebooklm-mcp.exe`).
 
 ---
 
-## 👨‍💻 Lógica de Programación (Paso a Paso)
+## 📥 Instalación e Inicialización (Primera Vez)
 
-Si abres `index.ts`, verás que el código sigue un flujo de trabajo muy secuencial:
+Sigue estos pasos para poner en marcha el proyecto desde cero:
 
-### 1. Lectura de Argumentos (Argument Parsing)
-En lugar de instalar una librería pesada como `commander` o `minimist`, hemos hecho una función nativa `parseArgs()`. 
-Esta función lee lo que escribes en la terminal (`process.argv`). Si escribes `--path "C:\mis-docs"`, el código busca los guiones `--`, coge la palabra clave (`path`) y le asigna el valor que va justo detrás. Devuelve un objeto tipo diccionario (un `Record<string, string>` en TypeScript).
-
-### 2. Inicialización del Cliente MCP
-Utilizamos la clase `StdioClientTransport` de la librería MCP. Esto significa que no nos conectamos por Internet a un servidor, sino que levantamos un proceso oculto en tu propia terminal (el `.exe` de FastMCP) y hablamos con él mandándole texto por la "Entrada Estándar" (Stdio).
-
-### 3. Lectura de Directorio
-Con `fs.readdirSync(targetDir)` obtenemos una lista de todos los archivos de la carpeta. Luego usamos un `.filter()` funcional para quedarnos estrictamente con los que terminan en `.md`.
-
-### 4. El Bucle de Subida y el "Delay"
-Usamos un bucle `for...of`. Dentro de él, leemos el texto del archivo y ejecutamos:
-```typescript
-await client.callTool({ name: "notebook_add_text", arguments: { ... } })
-```
-Aquí le pedimos al servidor MCP que use su herramienta `notebook_add_text`. 
-**Nota didáctica sobre concurrencia:** Justo después de la subida, usamos `await sleep(1500);`. Esto es una pausa artificial de 1.5 segundos. Si le tirásemos los 393 archivos de golpe a los servidores de Google en el mismo milisegundo, su firewall nos banearía por ataque DDoS (Rate Limiting).
-
-### 5. ¿Qué pasa si falla o no conecta? (Error Handling)
-Esta es la parte más interesante de este script. Usamos un bloque `try/catch`.
-Si se corta la conexión en red con el ejecutable local, la promesa `callTool` explota y el `catch (err)` la captura, parando el programa.
-
-**El "Engaño" de FastMCP (Fallo silencioso):**
-Al interactuar con la API de Google, nos dimos cuenta de que si nuestra sesión de usuario en Google (la cookie) había caducado, el servidor MCP no lanzaba una excepción real (`isError: true`). En su lugar, el servidor devolvía un mensaje de éxito (`isError: false`) pero colaba el error dentro del texto de la respuesta como un JSON camuflado: `{"status":"error","error":"RPC Error 16: Authentication expired"}`.
-
-Para arreglar este fallo silencioso, tuvimos que programar la máquina para que inspeccionara el interior del mensaje de éxito:
-```typescript
-const textOutput = result.content?.[0]?.text || "";
-if (textOutput.includes('"status":"error"')) {
-    throw new Error(textOutput); // Forzamos una explosión controlada
-}
+### 1. Clonar o descargar el proyecto
+Descarga el proyecto en tu máquina local y accede a su directorio raíz:
+```bash
+git clone https://github.com/josuebaverdnatura/notebooklm-update-book.git
+cd notebooklm-update-book
 ```
 
-### 6. Gestión de Sesión Caducada
-Si la excepción forzada contiene las palabras "auth", "session" o "login", el script no solo escupe el error técnico en rojo, sino que hace una **Parada de Emergencia** y le imprime al usuario un mensaje humano y amigable indicándole la solución: ejecutar `notebooklm-mcp-auth`.
+### 2. Instalar dependencias
+Instala los paquetes necesarios definidos en el `package.json`:
+```bash
+pnpm install
+```
+*(Si no usas pnpm, ejecuta `npm install` o `yarn install`)*.
 
 ---
 
-## 📚 Conceptos Clave de TypeScript para Aprender Aquí
+## 🔑 Flujo de Primer Uso (Paso a Paso)
 
-1. **Tipado Fuerte**: Fíjate que al declarar funciones o variables, añadimos dos puntos y el tipo (ej: `ms: number`). Esto hace que si intentas pasarle un texto a la función `sleep`, VSCode te pinte un error antes de ejecutar nada.
-2. **Asincronía (`async / await`)**: JavaScript no puede "esperar" congelando el programa. En su lugar usa Promesas. Al poner `async` en `function main()`, podemos usar `await` delante de tareas pesadas (como hablar con el MCP o hacer el `sleep`). Esto "pausa" esa línea hasta que el trabajo termina, permitiendo escribir código que se lee de arriba a abajo en vez de usar callbacks enredados.
+### Paso 1: Verificar el estado
+Comprueba que el script se conecta correctamente al servidor MCP y ve si tienes alguna sesión configurada:
+```bash
+pnpm tsx index.ts status
+```
+
+### Paso 2: Iniciar sesión con tu cuenta de Google
+Registra e inicia sesión en la cuenta que quieres usar. El script creará un perfil local aislado y abrirá una ventana de Chrome para que te autentiques:
+```bash
+pnpm tsx index.ts login tu-correo@gmail.com
+```
+1.  Se abrirá una ventana visible de Chrome.
+2.  Inicia sesión con tu cuenta de Google en esa ventana.
+3.  Una vez completado el inicio de sesión y cargado el panel de NotebookLM, **regresa a la terminal** de comandos y presiona **`ENTER`**.
+4.  El script guardará las cookies de esa sesión de forma segura y aislada en tu AppData local.
+
+### Paso 3: Subir conocimiento a un cuaderno
+Una vez logueado, puedes inyectar de manera masiva todos los archivos Markdown de cualquier carpeta local a tu cuaderno de NotebookLM:
+```bash
+pnpm tsx index.ts upload --path "C:\mis-proyectos\docs_md" --url "https://notebooklm.google.com/notebook/tu-uuid-de-cuaderno"
+```
+*   El script leerá todos los archivos `.md` de la ruta.
+*   Consultará las fuentes existentes en tu cuaderno para evitar duplicados. Si detecta que un archivo ya existe con el mismo nombre, **lo eliminará antes de subir la nueva versión**.
+*   Subirá las fuentes de una en una con un delay de seguridad de 1.5s para no saturar las cuotas de red.
+
+---
+
+## 🛠️ Comandos de la CLI
+
+El script principal soporta una interfaz organizada en subcomandos:
+
+*   **`pnpm tsx index.ts status`**: Muestra qué cuenta está activa actualmente y qué otras cuentas tienen sesiones guardadas de forma local en tu máquina.
+*   **`pnpm tsx index.ts login <email>`**: Cambia instantáneamente a la sesión del correo indicado. Si no existe, inicia el flujo de autenticación en navegador.
+*   **`pnpm tsx index.ts logout`**: Cierra la sesión activa actual y borra sus credenciales y perfil local.
+*   **`pnpm tsx index.ts logout <email>`**: Borra la sesión de la cuenta específica indicada.
+*   **`pnpm tsx index.ts logout --all`**: Borra todos los perfiles de sesión y credenciales guardados localmente.
+*   **`pnpm tsx index.ts upload --path <ruta> [--url <url>]`**: Inicia la subida masiva de Markdowns al cuaderno indicado.
+
+---
+
+## 🧠 ¿Cómo funciona la gestión multicuenta por debajo?
+
+El servidor MCP oficial de NotebookLM solo soporta por defecto una única sesión en disco (`chrome_profile`). Para superar esta limitación sin modificar el servidor:
+
+1.  El CLI detecta y cierra cualquier proceso huérfano del navegador Chrome asociado al MCP para evitar bloqueos del sistema de archivos.
+2.  Almacena cada sesión de usuario de forma aislada en carpetas nombradas por correo (`chrome_profile_<email>`).
+3.  Al usar el comando `login <email>`, el script realiza un renombrado dinámico y atómico de la carpeta para poner el perfil del usuario solicitado en la ubicación que el MCP espera (`chrome_profile`), logrando un cambio de cuenta instantáneo y sin fricciones.

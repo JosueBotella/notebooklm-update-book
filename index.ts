@@ -3,6 +3,7 @@ import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js'
 import * as fs from 'fs';
 import * as path from 'path';
 import * as readline from 'readline';
+import * as os from 'os';
 import { 
     printStatus, 
     switchAccount, 
@@ -41,8 +42,9 @@ const askQuestion = (query: string): Promise<string> => {
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 async function getMcpClient(): Promise<Client> {
+    const mcpPath = path.join(os.homedir(), '.local', 'bin', 'notebooklm-mcp.exe');
     const transport = new StdioClientTransport({
-        command: "C:\\Users\\josueba\\.local\\bin\\notebooklm-mcp.exe",
+        command: mcpPath,
         args: []
     });
 

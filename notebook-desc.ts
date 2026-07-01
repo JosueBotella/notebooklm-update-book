@@ -1,9 +1,12 @@
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
+import * as os from 'os';
+import * as path from 'path';
 
 async function main() {
+    const mcpPath = path.join(os.homedir(), '.local', 'bin', 'notebooklm-mcp.exe');
     const t = new StdioClientTransport({
-        command: 'C:/Users/josueba/.local/bin/notebooklm-mcp.exe',
+        command: mcpPath,
         args: []
     });
     const c = new Client({ name: 'test', version: '1' }, { capabilities: {} });
