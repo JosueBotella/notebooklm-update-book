@@ -183,6 +183,7 @@ export async function switchAccount(email: string, client: Client) {
             const chromeProcess = spawn(chromePath, [
                 `--user-data-dir=${activeProfilePath}`,
                 `--remote-debugging-port=9222`,
+                `--remote-allow-origins=*`,
                 `--no-first-run`,
                 url
             ], { detached: true, stdio: 'ignore' });
