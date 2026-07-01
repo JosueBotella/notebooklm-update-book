@@ -23,7 +23,7 @@ Sigue estos pasos para poner en marcha el CLI y dejarlo enlazado globalmente en 
 ### 1. Clonar el proyecto e instalar dependencias
 Descarga el proyecto en tu máquina local y accede a su directorio raíz:
 ```bash
-git clone https://github.com/josuebaverdnatura/notebooklm-update-book.git
+git clone https://github.com/JosueBotella/notebooklm-update-book.git
 cd notebooklm-update-book
 pnpm install
 ```
