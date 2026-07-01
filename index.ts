@@ -167,6 +167,28 @@ async function handleSelect(notebookId: string) {
         console.log("");
     } catch (e: any) {
         console.error("\n❌ Error seleccionando el cuaderno:", e.message || e);
+}
+
+async function handleCleanup() {
+    console.log("🧹 Iniciando limpieza del perfil de Chrome y sesiones de NotebookLM...");
+    killMcpChrome();
+    try {
+        const client = await getMcpClient();
+        const result = await client.callTool({
+            name: "cleanup_data",
+            arguments: { confirm: true, preserve_library: true }
+        }) as any;
+
+        const textOutput = result.content?.[0]?.text || "{}";
+        if (result.isError || textOutput.includes('"status":"error"')) {
+            throw new Error(textOutput || "Error al realizar la limpieza");
+        }
+
+        console.log("\n🎉 Limpieza completada con éxito. Se eliminaron perfiles bloqueados y temporales.");
+        console.log("👉 Ahora puedes intentar iniciar sesión de nuevo con: notebook login <email>");
+        console.log("");
+    } catch (e: any) {
+        console.error("\n❌ Error durante la limpieza:", e.message || e);
     } finally {
         process.exit(0);
     }
@@ -478,6 +500,10 @@ async function main() {
         case '--upload':
             await handleUpload();
             break;
+        case 'cleanup':
+        case '--cleanup':
+            await handleCleanup();
+            break;
         default:
             // Ver si coincide con un target de la config actual sin poner 'upload' explícito
             const configData = loadProjectConfig();
@@ -494,6 +520,7 @@ async function main() {
                 console.log("  notebook select <id>             Selecciona el cuaderno predeterminado para subidas");
                 console.log("  notebook upload <target>         Sube los archivos definidos en el target de notebook-sync.json");
                 console.log("  notebook upload --path <ruta>    Sube los archivos Markdown de forma tradicional");
+                console.log("  notebook cleanup                 Limpia bloqueos de perfiles de Chrome y archivos corruptos");
                 console.log("\nℹ️ También puedes usar '--path' directamente al inicio (ej. notebook --path ...) por compatibilidad.");
                 process.exit(0);
             }
