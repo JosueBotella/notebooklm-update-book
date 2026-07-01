@@ -173,25 +173,26 @@ async function handleSelect(notebookId: string) {
 }
 
 async function handleCleanup() {
-    console.log("🧹 Iniciando limpieza del perfil de Chrome y sesiones de NotebookLM...");
+    console.log("🧹 Iniciando limpieza nativa del perfil de Chrome y sesiones de NotebookLM...");
     killMcpChrome();
+    
+    const mcpDataDir = path.join(process.env.LOCALAPPDATA || '', 'notebooklm-mcp', 'Data');
+    const activeProfilePath = path.join(mcpDataDir, 'chrome_profile');
+    
     try {
-        const client = await getMcpClient();
-        const result = await client.callTool({
-            name: "cleanup_data",
-            arguments: { confirm: true, preserve_library: true }
-        }) as any;
-
-        const textOutput = result.content?.[0]?.text || "{}";
-        if (result.isError || textOutput.includes('"status":"error"')) {
-            throw new Error(textOutput || "Error al realizar la limpieza");
+        if (fs.existsSync(activeProfilePath)) {
+            console.log("🗑️ Eliminando directorio de perfil de Chrome activo...");
+            fs.rmSync(activeProfilePath, { recursive: true, force: true });
         }
-
-        console.log("\n🎉 Limpieza completada con éxito. Se eliminaron perfiles bloqueados y temporales.");
+        
+        fs.mkdirSync(activeProfilePath, { recursive: true });
+        console.log("📁 Recreando directorio de perfil limpio...");
+        
+        console.log("\n🎉 Limpieza completada con éxito. Se eliminaron perfiles bloqueados y archivos temporales de Chrome.");
         console.log("👉 Ahora puedes intentar iniciar sesión de nuevo con: notebook login <email>");
         console.log("");
     } catch (e: any) {
-        console.error("\n❌ Error durante la limpieza:", e.message || e);
+        console.error("\n❌ Error durante la limpieza nativa del perfil:", e.message || e);
     } finally {
         process.exit(0);
     }
