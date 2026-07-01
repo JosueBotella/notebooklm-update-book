@@ -167,6 +167,9 @@ async function handleSelect(notebookId: string) {
         console.log("");
     } catch (e: any) {
         console.error("\n❌ Error seleccionando el cuaderno:", e.message || e);
+    } finally {
+        process.exit(0);
+    }
 }
 
 async function handleCleanup() {
