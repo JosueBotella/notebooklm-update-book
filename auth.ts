@@ -1,7 +1,8 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { execSync } from 'child_process';
+import { execSync, spawnSync } from 'child_process';
 import * as readline from 'readline';
+import * as os from 'os';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 
 // Directorio del MCP en AppData de Windows
@@ -160,25 +161,14 @@ export async function switchAccount(email: string, client: Client) {
         console.log("⏳ Tienes hasta 10 minutos para completar el inicio de sesión...");
         
         try {
-            await client.callTool({
-                name: "re_auth",
-                arguments: { 
-                    show_browser: true,
-                    browser_options: {
-                        headless: false,
-                        show: true,
-                        timeout_ms: 180000 // 3 minutos de margen
-                    }
-                }
-            });
-            console.log("\n✅ Ventana de autenticación abierta. Por favor, inicia sesión en Chrome.");
-            console.log("Presiona ENTER en esta terminal una vez hayas completado el inicio de sesión en Google.");
+            console.log("⏳ Iniciando la herramienta interactiva de autenticación de NotebookLM...");
+            const mcpAuthPath = path.join(os.homedir(), '.local', 'bin', 'notebooklm-mcp-auth.exe');
             
-            // Esperar confirmación
-            await waitEnter();
+            // Ejecutar interactivamente con stdio: 'inherit' para que la terminal controle el navegador.
+            // Esto asegura que la ventana de Chrome se abra de forma visible y nativa.
+            spawnSync(mcpAuthPath, [], { stdio: 'inherit', shell: true });
             
-            // Comprobamos la salud
-            console.log("⏳ Verificando autenticación...");
+            console.log("\n⏳ Verificando autenticación...");
             const healthResult = await client.callTool({ name: "get_health", arguments: {} }) as any;
             const textOutput = healthResult.content?.[0]?.text || "{}";
             
@@ -199,7 +189,7 @@ export async function switchAccount(email: string, client: Client) {
                 }
             }
         } catch (authErr: any) {
-            console.error("❌ Error al abrir la ventana de login:", authErr.message || authErr);
+            console.error("❌ Error al ejecutar la herramienta de login interactivo:", authErr.message || authErr);
         }
     } else {
         console.log(`✅ Conectado exitosamente como ${email}.`);
