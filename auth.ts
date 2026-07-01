@@ -161,7 +161,7 @@ export async function switchAccount(email: string, client: Client) {
         
         try {
             await client.callTool({
-                name: "setup_auth",
+                name: "re_auth",
                 arguments: { 
                     show_browser: true,
                     browser_options: {
