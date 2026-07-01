@@ -1,0 +1,22 @@
+{
+  "project_name": "Nombre de tu Proyecto (Ej. vnapp-refactor)",
+  "targets": {
+    "docs": {
+      "notebook_id": "TU_NOTEBOOK_UUID_AQUI",
+      "path": "./vnapp-refactor",
+      "files": [
+        "memoria_arquitectura_supabase.md",
+        "PROGRESO.md",
+        "refactor_plan.md"
+      ]
+    },
+    "schema": {
+      "notebook_id": "TU_NOTEBOOK_UUID_AQUI",
+      "path": "./vnapp-refactor",
+      "files": [
+        "schema_supabase.md",
+        "db_relations.md"
+      ]
+    }
+  }
+}
