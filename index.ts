@@ -241,9 +241,12 @@ async function main() {
 
     switch (command) {
         case 'status':
+        case '--status':
+        case '-s':
             printStatus();
             process.exit(0);
         case 'login':
+        case '--login':
             const email = args[1];
             if (!email) {
                 console.error("❌ Error: Debes especificar un email. Ejemplo: tsx index.ts login josueba.verdnatura@gmail.com");
@@ -252,6 +255,7 @@ async function main() {
             await handleLogin(email);
             break;
         case 'logout':
+        case '--logout':
             const isAll = args.includes('--all');
             if (isAll) {
                 logoutAll();
@@ -261,6 +265,7 @@ async function main() {
             }
             process.exit(0);
         case 'upload':
+        case '--upload':
             await handleUpload();
             break;
         default:
