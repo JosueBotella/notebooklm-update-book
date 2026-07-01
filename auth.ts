@@ -29,6 +29,18 @@ function waitEnter(): Promise<void> {
     }));
 }
 
+function getChromePath(): string {
+    const paths = [
+        path.join(process.env.PROGRAMFILES || 'C:\\Program Files', 'Google', 'Chrome', 'Application', 'chrome.exe'),
+        path.join(process.env['PROGRAMFILES(X86)'] || 'C:\\Program Files (x86)', 'Google', 'Chrome', 'Application', 'chrome.exe'),
+        path.join(process.env.LOCALAPPDATA || '', 'Google', 'Chrome', 'Application', 'chrome.exe')
+    ];
+    for (const p of paths) {
+        if (fs.existsSync(p)) return p;
+    }
+    return 'chrome.exe';
+}
+
 // Función para matar procesos de Chrome huérfanos asociados al MCP
 export function killMcpChrome() {
     try {
@@ -161,12 +173,31 @@ export async function switchAccount(email: string, client: Client) {
         console.log("⏳ Tienes hasta 10 minutos para completar el inicio de sesión...");
         
         try {
-            console.log("⏳ Iniciando la herramienta interactiva de autenticación de NotebookLM...");
+            console.log("⏳ Forzando el lanzamiento de Google Chrome nativo...");
+            const chromePath = getChromePath();
+            const activeProfilePath = path.join(mcpDataDir, 'chrome_profile');
+            const url = "https://notebooklm.google.com";
+
+            // Lanzar Chrome nativo en Windows
+            const { spawn } = require('child_process');
+            const chromeProcess = spawn(chromePath, [
+                `--user-data-dir=${activeProfilePath}`,
+                `--remote-debugging-port=9222`,
+                `--no-first-run`,
+                url
+            ], { detached: true, stdio: 'ignore' });
+            chromeProcess.unref();
+
+            console.log("🚀 Google Chrome abierto. Por favor, inicia sesión en la ventana del navegador.");
+            console.log("⏳ Esperando a que el extractor de tokens se conecte...");
+            
+            // Pausa de 3 segundos para que el proceso de Chrome inicialice
+            await new Promise(resolve => setTimeout(resolve, 3000));
+
             const mcpAuthPath = path.join(os.homedir(), '.local', 'bin', 'notebooklm-mcp-auth.exe');
             
-            // Ejecutar interactivamente con stdio: 'inherit' para que la terminal controle el navegador.
-            // Esto asegura que la ventana de Chrome se abra de forma visible y nativa.
-            spawnSync(mcpAuthPath, [], { stdio: 'inherit', shell: true });
+            // Ejecutar el extractor de tokens apuntando a la ventana en puerto 9222
+            spawnSync(mcpAuthPath, ['--no-auto-launch'], { stdio: 'inherit', shell: true });
             
             console.log("\n⏳ Verificando autenticación...");
             const healthResult = await client.callTool({ name: "get_health", arguments: {} }) as any;
