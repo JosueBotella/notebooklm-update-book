@@ -62,72 +62,99 @@ export async function switchAccount(email: string, client: Client) {
     const config = readConfig();
     const currentActive = config.active_account;
 
-    // Si ya es la activa, comprobar que la carpeta realmente existe
     const activeProfilePath = path.join(mcpDataDir, 'chrome_profile');
-    if (currentActive === email && fs.existsSync(activeProfilePath)) {
-        console.log(`ℹ️ La cuenta ${email} ya está activa.`);
-        return;
-    }
-
-    // 1. Respaldar la cuenta activa actual si existe
-    if (currentActive && fs.existsSync(activeProfilePath)) {
-        const backupPath = path.join(mcpDataDir, `chrome_profile_${sanitizeEmail(currentActive)}`);
-        if (fs.existsSync(backupPath)) {
-            // Eliminar backup viejo antes de renombrar
-            fs.rmSync(backupPath, { recursive: true, force: true });
-        }
-        try {
-            fs.renameSync(activeProfilePath, backupPath);
-            console.log(`💾 Sesión de ${currentActive} guardada.`);
-        } catch (e: any) {
-            console.error(`❌ Error guardando sesión de ${currentActive}: ${e.message}`);
-            console.log("Intentando forzar el cerrado de procesos de Chrome...");
-            killMcpChrome();
-            fs.renameSync(activeProfilePath, backupPath);
-        }
-    }
-
-    // 2. Cargar la nueva cuenta o iniciarla de cero
-    const newAccountProfilePath = path.join(mcpDataDir, `chrome_profile_${sanitizeEmail(email)}`);
+    let skipRotation = false;
     let isNewLogin = false;
+    if (currentActive === email && fs.existsSync(activeProfilePath)) {
+        console.log(`ℹ️ La cuenta ${email} ya está activa. Verificando estado de la sesión...`);
+        skipRotation = true;
+    }
 
-    if (fs.existsSync(newAccountProfilePath)) {
-        // Si ya existe la carpeta de la nueva cuenta, la restauramos como activa
-        if (fs.existsSync(activeProfilePath)) {
-            fs.rmSync(activeProfilePath, { recursive: true, force: true });
+    if (!skipRotation) {
+        // 1. Respaldar la cuenta activa actual si existe
+        if (currentActive && fs.existsSync(activeProfilePath)) {
+            const backupPath = path.join(mcpDataDir, `chrome_profile_${sanitizeEmail(currentActive)}`);
+            if (fs.existsSync(backupPath)) {
+                // Eliminar backup viejo antes de renombrar
+                fs.rmSync(backupPath, { recursive: true, force: true });
+            }
+            try {
+                fs.renameSync(activeProfilePath, backupPath);
+                console.log(`💾 Sesión de ${currentActive} guardada.`);
+            } catch (e: any) {
+                console.error(`❌ Error guardando sesión de ${currentActive}: ${e.message}`);
+                console.log("Intentando forzar el cerrado de procesos de Chrome...");
+                killMcpChrome();
+                fs.renameSync(activeProfilePath, backupPath);
+            }
         }
-        fs.renameSync(newAccountProfilePath, activeProfilePath);
-        console.log(`🔄 Sesión de ${email} restaurada.`);
-    } else {
-        // No existe perfil guardado para esta cuenta
-        if (fs.existsSync(activeProfilePath)) {
-            if (!currentActive) {
-                // Importación implícita de sesión huérfana
-                console.log(`ℹ️ Asociando sesión activa existente en disco a la cuenta: ${email}`);
-            } else {
-                // Si había otra cuenta activa (que ya respaldamos arriba), limpiamos la carpeta activa
+
+        // 2. Cargar la nueva cuenta o iniciarla de cero
+        const newAccountProfilePath = path.join(mcpDataDir, `chrome_profile_${sanitizeEmail(email)}`);
+
+        if (fs.existsSync(newAccountProfilePath)) {
+            // Si ya existe la carpeta de la nueva cuenta, la restauramos como activa
+            if (fs.existsSync(activeProfilePath)) {
                 fs.rmSync(activeProfilePath, { recursive: true, force: true });
+            }
+            fs.renameSync(newAccountProfilePath, activeProfilePath);
+            console.log(`🔄 Sesión de ${email} restaurada.`);
+        } else {
+            // No existe perfil guardado para esta cuenta
+            if (fs.existsSync(activeProfilePath)) {
+                if (!currentActive) {
+                    // Importación implícita de sesión huérfana
+                    console.log(`ℹ️ Asociando sesión activa existente en disco a la cuenta: ${email}`);
+                } else {
+                    // Si había otra cuenta activa (que ya respaldamos arriba), limpiamos la carpeta activa
+                    fs.rmSync(activeProfilePath, { recursive: true, force: true });
+                    fs.mkdirSync(activeProfilePath, { recursive: true });
+                    isNewLogin = true;
+                    console.log(`🆕 Creando nueva sesión para ${email}...`);
+                }
+            } else {
                 fs.mkdirSync(activeProfilePath, { recursive: true });
                 isNewLogin = true;
                 console.log(`🆕 Creando nueva sesión para ${email}...`);
             }
-        } else {
-            fs.mkdirSync(activeProfilePath, { recursive: true });
-            isNewLogin = true;
-            console.log(`🆕 Creando nueva sesión para ${email}...`);
         }
+
+        // Actualizar configuración
+        config.active_account = email;
+        if (!config.saved_accounts) config.saved_accounts = [];
+        if (!config.saved_accounts.includes(email)) {
+            config.saved_accounts.push(email);
+        }
+        writeConfig(config);
     }
 
-    // Actualizar configuración
-    config.active_account = email;
-    if (!config.saved_accounts) config.saved_accounts = [];
-    if (!config.saved_accounts.includes(email)) {
-        config.saved_accounts.push(email);
+    // 3. Verificar si la sesión es válida llamando a get_health
+    console.log("⏳ Verificando estado de la sesión...");
+    let isAuthenticated = false;
+    try {
+        const healthResult = await client.callTool({ name: "get_health", arguments: {} }) as any;
+        const textOutput = healthResult.content?.[0]?.text || "{}";
+        
+        try {
+            const healthData = JSON.parse(textOutput);
+            if (healthData.success && healthData.data && healthData.data.authenticated) {
+                isAuthenticated = true;
+            } else if (textOutput.includes('"authenticated":true') || textOutput.includes('"authenticated": true')) {
+                isAuthenticated = true;
+            }
+        } catch (e) {
+            if (textOutput.includes('"authenticated":true') || textOutput.includes('"authenticated": true')) {
+                isAuthenticated = true;
+            }
+        }
+    } catch (e) {
+        // Ignorar y forzar re-login
     }
-    writeConfig(config);
 
-    // 3. Si es un nuevo login, lanzar la herramienta del MCP para autenticarse
-    if (isNewLogin) {
+    if (!isAuthenticated) {
+        if (!isNewLogin) {
+            console.log("⚠️ La sesión guardada ha caducado o no es válida. Iniciando renovación...");
+        }
         console.log("\n🔑 Se abrirá una ventana de Chrome para que inicies sesión en Google.");
         console.log("👉 Por favor, inicia sesión con la cuenta: " + email);
         console.log("⏳ Tienes hasta 10 minutos para completar el inicio de sesión...");
@@ -168,7 +195,7 @@ export async function switchAccount(email: string, client: Client) {
                 if (textOutput.includes('"authenticated":true') || textOutput.includes('"authenticated": true')) {
                     console.log(`🎉 ¡Autenticado exitosamente como ${email}!`);
                 } else {
-                    console.warn("⚠️ Advertencia: No pudimos verificar la respuesta de salud. Ejecuta 'tsx index.ts status' para comprobarlo.");
+                    console.warn("⚠️ Advertencia: No pudimos verificar la respuesta de salud.");
                 }
             }
         } catch (authErr: any) {
