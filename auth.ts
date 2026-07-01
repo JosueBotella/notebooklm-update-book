@@ -12,6 +12,7 @@ const configFilePath = path.join(mcpDataDir, 'auth_config.json');
 export interface AuthConfig {
     active_account?: string;
     saved_accounts?: string[];
+    projects?: Record<string, string>; // Mapea project_name -> local_directory_path
 }
 
 function sanitizeEmail(email: string): string {
@@ -324,5 +325,33 @@ export function printStatus() {
             console.log(`   - 📧 ${acc} ${statusIndicator}`);
         }
     }
+    
+    console.log("\n📁 Proyectos registrados localmente:");
+    const projects = config.projects || {};
+    const projectKeys = Object.keys(projects);
+    if (projectKeys.length === 0) {
+        console.log("   - Ninguno registrado. Se vinculan automáticamente al usar subidas desde sus directorios.");
+    } else {
+        for (const pName of projectKeys) {
+            console.log(`   - 📦 \x1b[35m${pName}\x1b[0m -> ${projects[pName]}`);
+        }
+    }
     console.log("");
+}
+
+export function registerProject(projectName: string, dirPath: string) {
+    const config = readConfig();
+    if (!config.projects) config.projects = {};
+    
+    if (config.projects[projectName] !== dirPath) {
+        config.projects[projectName] = dirPath;
+        writeConfig(config);
+        console.log(`ℹ️ Registro automático: Proyecto "\x1b[35m${projectName}\x1b[0m" vinculado a la ruta: ${dirPath}`);
+    }
+}
+
+export function getProjectDir(projectName: string): string | null {
+    const config = readConfig();
+    const projects = config.projects || {};
+    return projects[projectName] || null;
 }

@@ -1,21 +1,22 @@
 {
-  "project_name": "Nombre de tu Proyecto (Ej. vnapp-refactor)",
+  "project_name": "vnapprefactor",
   "targets": {
     "docs": {
-      "notebook_id": "TU_NOTEBOOK_UUID_AQUI",
+      "notebook_id": "a0f74dc3-ae95-4ddd-817b-a565677c6c5a",
       "path": "./vnapp-refactor",
       "files": [
         "memoria_arquitectura_supabase.md",
         "PROGRESO.md",
-        "refactor_plan.md"
+        "refactor_plan.md",
+        "PENDIENTES.md"
       ]
     },
     "schema": {
-      "notebook_id": "TU_NOTEBOOK_UUID_AQUI",
-      "path": "./vnapp-refactor",
+      "notebook_id": "a0f74dc3-ae95-4ddd-817b-a565677c6c5a",
+      "path": "./brain-notes",
       "files": [
-        "schema_supabase.md",
-        "db_relations.md"
+        "Diccionario_BBDD_Completo.md",
+        "Diccionario_Supabase_Completo.md"
       ]
     }
   }

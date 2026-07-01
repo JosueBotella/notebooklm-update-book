@@ -10,7 +10,9 @@ import {
     logout, 
     logoutAll, 
     readConfig, 
-    killMcpChrome 
+    killMcpChrome,
+    registerProject,
+    getProjectDir
 } from './auth.js';
 
 interface TargetConfig {
@@ -204,41 +206,83 @@ async function handleUpload() {
     const args = parseArgs();
     const commandArgs = process.argv.slice(2);
     
-    // Buscar target en los argumentos de la CLI
-    let targetName: string | undefined = undefined;
-    const uploadIdx = commandArgs.findIndex(arg => arg === 'upload' || arg === '--upload');
-    
-    if (uploadIdx !== -1 && commandArgs[uploadIdx + 1] && !commandArgs[uploadIdx + 1].startsWith('-')) {
-        targetName = commandArgs[uploadIdx + 1];
+    // Identificar argumentos de interés (posicionales)
+    let posArgs: string[] = [];
+    if (commandArgs[0] === 'upload' || commandArgs[0] === '--upload') {
+        posArgs = commandArgs.slice(1).filter(arg => !arg.startsWith('-'));
+    } else {
+        posArgs = commandArgs.filter(arg => !arg.startsWith('-'));
     }
 
-    const projectConfigData = loadProjectConfig();
     let targetConfig: TargetConfig | undefined = undefined;
     let configDir = process.cwd();
+    let targetName: string | undefined = undefined;
+    let projectConfigData: { config: ProjectConfig; filePath: string } | null = null;
 
-    if (projectConfigData) {
-        const { config, filePath } = projectConfigData;
-        configDir = path.dirname(filePath);
-        const targets = config.targets;
+    // 1. Comprobar si el primer argumento coincide con un proyecto registrado
+    const potentialProject = posArgs[0];
+    const registeredDir = potentialProject ? getProjectDir(potentialProject) : null;
 
-        // Si el usuario ejecuta "notebook docs" directamente (sin "upload")
-        const firstArg = commandArgs[0];
-        if (!targetName && firstArg && targets[firstArg] && firstArg !== 'upload') {
-            targetName = firstArg;
-        }
-
-        if (targetName) {
-            targetConfig = targets[targetName];
-            if (!targetConfig) {
-                console.error(`❌ Error: El target "${targetName}" no existe en notebook-sync.json.`);
-                console.log("Targets disponibles:", Object.keys(targets).join(', '));
-                process.exit(1);
+    if (potentialProject && registeredDir && fs.existsSync(registeredDir)) {
+        // Encontramos el proyecto por su registro global
+        configDir = registeredDir;
+        const configPath = path.join(configDir, 'notebook-sync.json');
+        if (fs.existsSync(configPath)) {
+            try {
+                const config = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+                if (config && config.targets) {
+                    projectConfigData = { config, filePath: configPath };
+                }
+            } catch (e: any) {
+                console.error(`⚠️ Error al parsear el archivo notebook-sync.json del proyecto "${potentialProject}": ${e.message}`);
             }
-            console.log(`📦 Usando configuración del target: \x1b[35m${targetName}\x1b[0m (Proyecto: ${config.project_name || "Sin nombre"})`);
-        } else if (commandArgs[0] === 'upload' || commandArgs[0] === '--upload' || commandArgs.includes('--path')) {
-            // El usuario llamó a upload pero sin target, o tiene flags. Si tiene --path seguimos tradicional.
-            if (!args.path) {
-                console.log(`ℹ️ Detectado notebook-sync.json (Proyecto: ${config.project_name || "Sin nombre"})`);
+        }
+        
+        targetName = posArgs[1]; // El segundo argumento es el target
+        if (projectConfigData) {
+            const targets = projectConfigData.config.targets;
+            if (targetName) {
+                targetConfig = targets[targetName];
+                if (!targetConfig) {
+                    console.error(`❌ Error: El target "${targetName}" no existe en el proyecto "${potentialProject}".`);
+                    console.log("Targets disponibles:", Object.keys(targets).join(', '));
+                    process.exit(1);
+                }
+                console.log(`📦 Usando target \x1b[35m${targetName}\x1b[0m del proyecto registrado: \x1b[36m${potentialProject}\x1b[0m`);
+            } else {
+                console.log(`ℹ️ Proyecto registrado: \x1b[36m${potentialProject}\x1b[0m (${configDir})`);
+                console.log("Targets disponibles:");
+                for (const key of Object.keys(targets)) {
+                    console.log(`  - \x1b[35m${key}\x1b[0m: ${targets[key].path} (${targets[key].files?.length || "todos"} archivos)`);
+                }
+                console.log(`\nUso: notebook upload ${potentialProject} <target>`);
+                process.exit(0);
+            }
+        }
+    } else {
+        // 2. Si no es un proyecto registrado, buscamos notebook-sync.json en el directorio actual
+        projectConfigData = loadProjectConfig();
+        if (projectConfigData) {
+            const { config, filePath } = projectConfigData;
+            configDir = path.dirname(filePath);
+            const targets = config.targets;
+
+            // Registrar automáticamente el proyecto local si tiene project_name
+            if (config.project_name) {
+                registerProject(config.project_name, configDir);
+            }
+
+            targetName = posArgs[0]; // El primer argumento es el target
+            if (targetName) {
+                targetConfig = targets[targetName];
+                if (!targetConfig) {
+                    console.error(`❌ Error: El target "${targetName}" no existe en el notebook-sync.json local.`);
+                    console.log("Targets disponibles:", Object.keys(targets).join(', '));
+                    process.exit(1);
+                }
+                console.log(`📦 Usando target \x1b[35m${targetName}\x1b[0m (Proyecto: ${config.project_name || "Sin nombre"})`);
+            } else if (!args.path) {
+                console.log(`ℹ️ Detectado notebook-sync.json local (Proyecto: ${config.project_name || "Sin nombre"})`);
                 console.log("Targets disponibles:");
                 for (const key of Object.keys(targets)) {
                     console.log(`  - \x1b[35m${key}\x1b[0m: ${targets[key].path} (${targets[key].files?.length || "todos"} archivos)`);
