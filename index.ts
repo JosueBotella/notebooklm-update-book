@@ -130,12 +130,14 @@ async function handleList() {
             console.log("   - No se encontraron cuadernos en tu cuenta.");
         } else {
             console.log(
-                "   " + "ID".padEnd(38) + " | " + "NOMBRE".padEnd(35) + " | " + "TEMAS\n" +
-                "   " + "-".repeat(38) + "-+-" + "-".repeat(35) + "-+-" + "-".repeat(20)
+                "   " + "ID".padEnd(38) + " | " + "NOMBRE".padEnd(35) + " | " + "DETALLES\n" +
+                "   " + "-".repeat(38) + "-+-" + "-".repeat(35) + "-+-" + "-".repeat(30)
             );
             for (const nb of notebooks) {
-                const topicsStr = Array.isArray(nb.topics) ? nb.topics.slice(0, 3).join(', ') : '';
-                console.log(`   ${nb.id.padEnd(38)} | ${nb.name.slice(0, 35).padEnd(35)} | ${topicsStr}`);
+                const title = nb.title || nb.name || 'Sin título';
+                const sourceCount = nb.source_count !== undefined ? nb.source_count : 'N/D';
+                const modifiedAt = nb.modified_at ? new Date(nb.modified_at).toLocaleDateString() : 'N/D';
+                console.log(`   ${nb.id.padEnd(38)} | ${title.slice(0, 35).padEnd(35)} | ${sourceCount} fuentes (Modificado: ${modifiedAt})`);
             }
         }
         console.log("");
