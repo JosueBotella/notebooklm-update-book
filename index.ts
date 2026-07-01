@@ -234,7 +234,7 @@ async function main() {
     const command = args[0];
 
     // Por compatibilidad con los scripts preexistentes que usan --path directamente
-    if (command && command.startsWith('--')) {
+    if (command && (command === '--path' || args.includes('--path'))) {
         await handleUpload();
         return;
     }
