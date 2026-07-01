@@ -135,7 +135,14 @@ export async function switchAccount(email: string, client: Client) {
         try {
             await client.callTool({
                 name: "setup_auth",
-                arguments: { show_browser: true }
+                arguments: { 
+                    show_browser: true,
+                    browser_options: {
+                        headless: false,
+                        show: true,
+                        timeout_ms: 180000 // 3 minutos de margen
+                    }
+                }
             });
             console.log("\n✅ Ventana de autenticación abierta. Por favor, inicia sesión en Chrome.");
             console.log("Presiona ENTER en esta terminal una vez hayas completado el inicio de sesión en Google.");
