@@ -1,0 +1,17 @@
+{
+  "name": "notebooklm-update-book",
+  "version": "1.0.0",
+  "description": "Herramienta CLI para inyectar carpetas de Markdown a NotebookLM vía MCP",
+  "main": "index.ts",
+  "scripts": {
+    "sync:schema": "tsx extract-supabase-schema.ts && tsx index.ts --path \"../brain-notes/03_BBDD_Consolidada\"",
+    "sync:docs": "tsx index.ts --path \"../vnapp-refactor/docs_md\"",
+    "clean:sources": "tsx clean-sources.ts"
+  },
+  "devDependencies": {
+    "@modelcontextprotocol/sdk": "^1.2.1",
+    "@types/node": "^20.0.0",
+    "tsx": "^4.7.1",
+    "typescript": "^5.4.2"
+  }
+}
