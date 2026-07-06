@@ -391,8 +391,18 @@ async function handleUpload() {
             console.log(`   - 📄 ${file}`);
         }
 
-        const answer = await askQuestion("\n¿Estás seguro de que quieres subir todas estas fuentes al cuaderno? (s/N): ");
-        if (answer.toLowerCase() !== 's') {
+        let confirmUpload = false;
+        if (args.yes === 'true' || args.y === 'true' || args.confirm === 'true') {
+            confirmUpload = true;
+            console.log("\n⚠️ Saltando confirmación de subida (--yes activa)...");
+        } else {
+            const answer = await askQuestion("\n¿Estás seguro de que quieres subir todas estas fuentes al cuaderno? (s/N): ");
+            if (answer.toLowerCase() === 's') {
+                confirmUpload = true;
+            }
+        }
+
+        if (!confirmUpload) {
             console.log("🛑 Operación de subida cancelada por el usuario.");
             process.exit(0);
         }
