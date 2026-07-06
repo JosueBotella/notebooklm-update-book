@@ -3,7 +3,7 @@
   "targets": {
     "docs": {
       "notebook_id": "a0f74dc3-ae95-4ddd-817b-a565677c6c5a",
-      "path": "./vnapp-refactor",
+      "path": "../vnapp-refactor/docs_md",
       "files": [
         "memoria_arquitectura_supabase.md",
         "PROGRESO.md",
@@ -13,7 +13,7 @@
     },
     "schema": {
       "notebook_id": "a0f74dc3-ae95-4ddd-817b-a565677c6c5a",
-      "path": "./brain-notes",
+      "path": "../brain-notes/03_BBDD_Consolidada",
       "files": [
         "Diccionario_BBDD_Completo.md",
         "Diccionario_Supabase_Completo.md"
